@@ -1,0 +1,36 @@
+import { expect, it } from 'vitest';
+import { workspaceReducer, type WorkspaceState } from './reducer';
+import { createEmptyData } from '../lib/sampleData';
+import { selectActivity, selectProjectProgress, selectStatistics } from '../lib/selectors';
+import { createStorageAdapter } from '../lib/storage';
+
+it('updates insights through a task lifecycle and round-trips the final workspace', () => {
+  const now = new Date(2026, 10, 27, 12);
+  const at = now.toISOString();
+  const project = { id: 'p1', name: 'Release', createdAt: at, updatedAt: at };
+  const task = { id: 't1', title: 'Ship release', description: '', projectId: 'p1', priority: 'high' as const, status: 'todo' as const, dueDate: '2026-11-26', createdAt: at, updatedAt: at, completedAt: null };
+  let state: WorkspaceState = { phase: 'loading' };
+  state = workspaceReducer(state, { type: 'loaded', data: createEmptyData() });
+  state = workspaceReducer(state, { type: 'projectCreated', project });
+  state = workspaceReducer(state, { type: 'taskCreated', task });
+  const data = () => { if (state.phase !== 'ready') throw new Error('Not ready'); return state.data; };
+  expect(selectStatistics(data(), now)).toEqual({ total: 1, open: 1, completed: 0, overdue: 1 });
+  state = workspaceReducer(state, { type: 'taskStatusChanged', id: task.id, done: true, at });
+  expect(selectStatistics(data(), now)).toEqual({ total: 1, open: 0, completed: 1, overdue: 0 });
+  expect(selectProjectProgress(data(), project.id).percent).toBe(100);
+  expect(selectActivity(data(), now)[6]!.completed).toBe(1);
+  state = workspaceReducer(state, { type: 'taskStatusChanged', id: task.id, done: false, at });
+  expect(selectProjectProgress(data(), project.id).percent).toBe(0);
+  expect(selectActivity(data(), now)[6]!.completed).toBe(0);
+  state = workspaceReducer(state, { type: 'taskStatusChanged', id: task.id, done: true, at });
+  state = workspaceReducer(state, { type: 'projectDeleted', id: project.id, at });
+  expect(data().tasks[0]!.projectId).toBeNull();
+  expect(selectActivity(data(), now)[6]!.completed).toBe(1);
+  let raw: string | null = null;
+  const storage = createStorageAdapter(() => ({ getItem: () => raw, setItem: (_key, value) => { raw = value; } }));
+  expect(storage.save(data(), null).ok).toBe(true);
+  expect(storage.load()).toMatchObject({ kind: 'ready', data: data() });
+  state = workspaceReducer(state, { type: 'taskDeleted', id: task.id });
+  expect(selectStatistics(data(), now).total).toBe(0);
+  expect(selectActivity(data(), now).every(day => day.completed === 0)).toBe(true);
+});
