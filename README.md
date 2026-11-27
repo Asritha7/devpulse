@@ -62,7 +62,7 @@ The storage adapter accepts an injectable storage interface, allowing failure an
 - A missing key is seeded once with fictional sample projects/tasks, dated relative to first launch. Existing data, including a valid empty workspace, is never reseeded.
 - Corrupt or unsupported content opens recovery without writing to storage. Reload is safe. Reset requires an explicit checkbox acknowledgment and replaces only the DevPulse key with an empty workspace.
 - If you need to preserve invalid data before reset, copy the raw key value using browser developer tools. JSON export/import is not implemented.
-- Blocked/full storage shows a visible warning and allows session-only appearance changes with an explicit retry. Initial blocked access uses an empty workspace because the app cannot know whether existing saved data is present.
+- Blocked/full storage shows a visible warning and allows session-only workspace changes with an explicit retry. Initial blocked access uses an empty workspace because the app cannot know whether existing saved data is present.
 - Saves compare the current storage value with the loaded snapshot. Cross-tab changes suspend writes and request reload. This is a single-active-editor app: localStorage has no atomic compare-and-set, so simultaneous writes in separate tabs are not transactionally coordinated.
 - This is local persistence, not a backup or encryption mechanism. Browser/site data clearing removes saved data.
 
@@ -70,11 +70,13 @@ The storage adapter accepts an injectable storage interface, allowing failure an
 
 Vitest covers reducer transitions, immutable theme updates, failed saves/retries, derived statistics, date boundaries, schema validation, corrupt data preservation, explicit reset, quota errors and stale writes. Tests use a fixed clock and injected storage; the application uses no testing dependency at runtime.
 
-Milestones 3–4 verification: run `npm run check` for strict TypeScript, zero-warning lint, focused Vitest tests and production build. Tests now include task/project CRUD, completion chronology, conflict blocking, combined filters, dynamic insight updates and persistence round-trip of a complete task lifecycle. Browser interaction and responsive visual checks are manual; no new browser smoke test has been claimed for this increment.
+Run `npm run check` for strict TypeScript, lint, tests and the production build. The release review passed all 55 tests, including storage event handling and contrast calculations for both themes.
+
+Chrome verification covered task creation, editing, completion, reopening, search, project creation, live counts and focus return. Initial form focus was corrected afterward and still needs a browser retest. A previous Chrome smoke check verified theme persistence after reload. Remaining release checks include task deletion, project rename/deletion, combined filters, persistence of edited records, keyboard focus visibility and storage recovery/conflicts in the browser.
 
 Manual inspection checklist:
 
-1. Open the app at desktop, tablet and mobile sizes; check wrapping and absence of horizontal scrolling.
+1. Open the app at 390px, 768px and 1440px viewport widths; check wrapping and absence of horizontal scrolling.
 2. Select light and dark themes, reload, and verify persistence. Select system and change the OS appearance.
 3. Use only the keyboard: skip link, theme radios (arrow keys), visible focus and recovery controls.
 4. In a **separate test browser profile/origin**, set `devpulse.workspace` to invalid JSON and reload. Confirm recovery appears and the bytes are unchanged until an acknowledged reset.
